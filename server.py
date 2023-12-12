@@ -64,7 +64,7 @@ class Server:
         self.connections += 1
 
         while True:
-            self.handle_player_connections()
+            self.handle_player_connections(conn, bo, game)
 
         self.connections -= 1
         self.cleanup_game(game)
@@ -81,7 +81,7 @@ class Server:
         self.send_data(conn, bo)
 
         while True:
-            handle_spec_connections()
+            self.handle_spec_connections(conn, game_ind)
 
         print(f"[DISCONNECT] Spectator left game: {game}")
         specs -= 1
@@ -98,7 +98,7 @@ class Server:
         except:
             pass
 
-    def handle_spec_connections(self):
+    def handle_spec_connections(self, conn, game_ind):
         available_games = list(self.games.keys())
         bo = self.games[available_games[game_ind]]
         try:
@@ -121,10 +121,10 @@ class Server:
     def process_spectator_data(self,data, available_games, game_ind):
         if data == "forward":
             print("[SPECTATOR] Moved self.games forward")
-            game_ind = (game_ind + 1) % len(available_self.games)
+            game_ind = (game_ind + 1) % len(available_games)
         elif data == "back":
             print("[SPECTATOR] Moved self.games back")
-            game_ind = (game_ind - 1) % len(available_self.games)
+            game_ind = (game_ind - 1) % len(available_games)
         else:
             print("[ERROR] Invalid Game Received from Spectator")
         return game_ind
@@ -134,7 +134,7 @@ class Server:
         conn.sendall(send_data)
 
 
-    def handle_player_connections(self):
+    def handle_player_connections(self, conn, bo, game):
         if game not in self.games:
             return
 
@@ -154,21 +154,21 @@ class Server:
         d = conn.recv(8192 * 3)
         return d.decode("utf-8")
 
-    def process_data(self,data, bo, game, self.current_id):
+    def process_data(self,data, bo, game):
         if "select" in data:
-            handle_select(data, bo)
+            self.handle_select(data, bo)
 
         if data in ["winner b", "winner w"]:
-            handle_winner(data, bo, game)
+            self.handle_winner(data, bo, game)
 
         if data == "update moves":
             bo.update_moves()
 
         if "name" in data:
-            handle_name(data, bo, self.current_id)
+            self.handle_name(data, bo, self.current_id)
 
         if bo.ready:
-            handle_time(bo)
+            self.handle_time(bo)
 
     def handle_select(self,data, bo):
         all = data.split(" ")
@@ -181,7 +181,7 @@ class Server:
         bo.winner = data.split(" ")[1]
         print(f"[GAME] Player {bo.winner} won in game {game}")
 
-    def handle_name(self,data, bo, self.current_id):
+    def handle_name(self,data, bo):
         name = data.split(" ")[1]
         if self.current_id == "b":
             bo.p2Name = name
@@ -194,6 +194,8 @@ class Server:
         else:
             bo.time2 = 900 - (time.time() - bo.startTime) - bo.storedTime2
 
+        
+
     def send_data(self,conn, bo):
         sendData = pickle.dumps(bo)
         conn.sendall(sendData)
@@ -201,15 +203,15 @@ class Server:
 
     def run_server(self):
         while True:
-            read_specs()
-            if connections < 6:
+            self.read_specs()
+            if self.connections < 6:
                 conn, addr = s.accept()
                 spec = False
                 g = self.get_game_id()
                 print("[CONNECT] New connection")
-                print("[DATA] Number of Connections:", connections+1)
+                print("[DATA] Number of Connections:", self.connections+1)
                 print("[DATA] Number of self.games:", len(self.games))
-                start_new_thread(threaded_client, (conn,g,spec))
+                start_new_thread(self.threaded_client, (conn,g,spec))
 
     def get_game_id(self):
         for game in self.games.keys():
